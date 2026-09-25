@@ -28,11 +28,11 @@ jobs:
             expect: survive
             expected_hash: e073d40a43dbb1917b08f3ac20dbdd270dff1a51
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Toolchain versions
         run: |
@@ -118,9 +118,21 @@ jobs:
           if [ "$DIED" = "true" ]; then
             echo "outcome=crash" >> "$GITHUB_OUTPUT"
             echo "died_after=$DIED_AFTER" >> "$GITHUB_OUTPUT"
+            # ReportCrash needs a moment after the process exits to finish
+            # writing the .ips -- wait for it rather than checking once.
+            for j in $(seq 1 20); do
+              if ls "$HOME/Library/Logs/DiagnosticReports/FirebasexLogEventRace-"*.ips >/dev/null 2>&1; then
+                echo "Found the .ips report after ${j}s of waiting"
+                break
+              fi
+              sleep 1
+            done
           else
             echo "outcome=survive" >> "$GITHUB_OUTPUT"
           fi
+          xcrun simctl spawn "${{ steps.sim.outputs.udid }}" log show \
+            --predicate 'process == "FirebasexLogEventRace"' --style compact --last 2m \
+            > "device-log-${{ matrix.id }}.txt" 2>&1 || true
 
       - name: Report and verify the outcome
         env:
@@ -153,11 +165,12 @@ jobs:
           fi
           echo "OK: observed '$OUTCOME' as expected for ${{ matrix.id }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ${{ matrix.id }}-evidence
           path: |
             screenshot-${{ matrix.id }}.png
             crash-report-${{ matrix.id }}.ips
+            device-log-${{ matrix.id }}.txt
           if-no-files-found: ignore
