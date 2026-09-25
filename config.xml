@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.maximbelov.firebasexlogeventrace" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>FirebasexLogEventRace</name>
+    <description>
+        Minimal reproducer for the logEvent/screen-reporter race in cordova-plugin-firebasex-analytics.
+    </description>
+    <author email="belov1988@gmail.com" href="https://github.com/MaximBelov">Maxim Belov</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <preference name="deployment-target" value="15.0" />
+    <preference name="ScrollEnabled" value="false" />
+
+    <platform name="ios">
+        <allow-intent href="itms:*" />
+        <allow-intent href="itms-apps:*" />
+        <engine name="ios" spec="8.1.1" />
+    </platform>
+
+    <plugin name="cordova-plugin-firebasex-core" spec="2.0.1" />
+    <plugin name="cordova-plugin-firebasex-analytics" spec="2.0.2" />
+</widget>

@@ -1,0 +1,40 @@
+{
+  "name": "firebasex-logevent-race-repro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Cordova reproducer for the logEvent/screen-reporter race in cordova-plugin-firebasex-analytics",
+  "scripts": {
+    "apply-fix": "patch -p1 -d node_modules/cordova-plugin-firebasex-analytics < patches/cordova-plugin-firebasex-analytics+2.0.2.patch",
+    "build:ios": "cordova platform add ios@8.1.1"
+  },
+  "devDependencies": {
+    "cordova": "13.0.0",
+    "cordova-ios": "8.1.1"
+  },
+  "dependencies": {
+    "cordova-plugin-firebasex-analytics": "2.0.2",
+    "cordova-plugin-firebasex-core": "2.0.1"
+  },
+  "cordova": {
+    "platforms": [
+      "ios"
+    ],
+    "plugins": {
+      "cordova-plugin-firebasex-core": {
+        "IOS_FIREBASE_SDK_VERSION": "12.14.0"
+      },
+      "cordova-plugin-firebasex-analytics": {
+        "FIREBASE_ANALYTICS_COLLECTION_ENABLED": "true",
+        "FIREBASE_ANALYTICS_WITHOUT_ADS": "false",
+        "GOOGLE_ANALYTICS_ADID_COLLECTION_ENABLED": "true",
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_ANALYTICS_STORAGE": "true",
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_STORAGE": "true",
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_USER_DATA": "true",
+        "GOOGLE_ANALYTICS_DEFAULT_ALLOW_AD_PERSONALIZATION_SIGNALS": "true",
+        "IOS_ON_DEVICE_CONVERSION_ANALYTICS": "false",
+        "IOS_FIREBASE_SDK_VERSION": "12.14.0",
+        "IOS_GOOGLE_TAG_MANAGER_VERSION": "9.1.0"
+      }
+    }
+  }
+}

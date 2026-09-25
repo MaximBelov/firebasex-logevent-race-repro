@@ -1,0 +1,22 @@
+app: FirebasexLogEventRace  bug_type: 309
+exception: EXC_CRASH / SIGABRT
+termination: SIGNAL code=6 (Abort trap: 6)
+
+uncaught-exception backtrace (top frames, innermost first):
+  CoreFoundation               __exceptionPreprocess
+  libobjc.A.dylib              objc_exception_throw
+  CoreFoundation               +[NSObject(NSObject) instanceMethodSignatureForSelector:]
+  CoreFoundation               ___forwarding___
+  CoreFoundation               _CF_forwarding_prep_0
+  FirebasexLogEventRace.debug.dylib APMScreenParameters
+  FirebasexLogEventRace.debug.dylib -[APMAdExposureReporter handleScreenDidChangeFromScreen:toScreen:]
+  FirebasexLogEventRace.debug.dylib -[APMScreenViewReporter postScreenDidChangeNotificationWithPreviousScreen:newScreen:]
+  FirebasexLogEventRace.debug.dylib __61-[APMScreenViewReporter trackScreenWithParameters:timestamp:]_block_invoke.513
+  libdispatch.dylib            _dispatch_call_block_and_release
+  libdispatch.dylib            _dispatch_client_callout
+  libdispatch.dylib            _dispatch_lane_serial_drain
+  libdispatch.dylib            _dispatch_lane_invoke
+  libdispatch.dylib            _dispatch_root_queue_drain_deferred_wlh
+  libdispatch.dylib            _dispatch_workloop_worker_thread
+  libsystem_pthread.dylib      _pthread_wqthread
+  libsystem_pthread.dylib      start_wqthread

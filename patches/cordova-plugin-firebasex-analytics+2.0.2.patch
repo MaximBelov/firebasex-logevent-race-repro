@@ -1,0 +1,32 @@
+diff --git a/src/ios/FirebasexAnalyticsPlugin.m b/src/ios/FirebasexAnalyticsPlugin.m
+index 65d492f..e073d40 100644
+--- a/src/ios/FirebasexAnalyticsPlugin.m
++++ b/src/ios/FirebasexAnalyticsPlugin.m
+@@ -22,10 +22,17 @@ @implementation FirebasexAnalyticsPlugin
+ /**
+  * Logs a custom analytics event.
+  *
++ * Dispatched to the main queue rather than @c runInBackground:, which uses Cordova's
++ * concurrent global queue. @c logEventWithName:parameters: reaches
++ * @c APMScreenViewReporter synchronously on the calling thread to attach the current
++ * screen to the event, and the SDK's automatic screen reporting writes that same state
++ * from the main thread, so a background caller races it.
++ * See https://github.com/firebase/firebase-ios-sdk/issues/6373
++ *
+  * @param command args[0] = event name, args[1] = parameters dictionary.
+  */
+ - (void)logEvent:(CDVInvokedUrlCommand*)command {
+-    [self.commandDelegate runInBackground:^{
++    dispatch_async(dispatch_get_main_queue(), ^{
+         @try {
+             NSString* name = [command.arguments objectAtIndex:0];
+             NSDictionary* parameters = [command argumentAtIndex:1];
+@@ -35,7 +42,7 @@ - (void)logEvent:(CDVInvokedUrlCommand*)command {
+         } @catch (NSException *exception) {
+             [self handleException:exception command:command];
+         }
+-    }];
++    });
+ }
+
+ /**

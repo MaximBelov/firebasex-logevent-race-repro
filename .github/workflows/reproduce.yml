@@ -1,0 +1,163 @@
+name: Reproduce the logEvent race
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    name: ${{ matrix.title }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: unpatched
+            title: "bug: analytics@2.0.2 as published (expect a crash)"
+            apply_patch: false
+            expect: crash
+            expected_hash: 65d492fa354eba03ac488139bac3156b2222e345
+          - id: patched
+            title: "fix: with PR #5 applied (expect no crash)"
+            apply_patch: true
+            expect: survive
+            expected_hash: e073d40a43dbb1917b08f3ac20dbdd270dff1a51
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          node -v
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply the fix from PR #5
+        if: matrix.apply_patch
+        run: npm run apply-fix
+
+      - name: Verify which plugin source is about to be built
+        run: |
+          ACTUAL=$(git hash-object node_modules/cordova-plugin-firebasex-analytics/src/ios/FirebasexAnalyticsPlugin.m)
+          echo "FirebasexAnalyticsPlugin.m blob: $ACTUAL"
+          if [ "$ACTUAL" != "${{ matrix.expected_hash }}" ]; then
+            echo "::error::Expected blob ${{ matrix.expected_hash }}, got $ACTUAL -- the published plugin version or the patch has drifted."
+            exit 1
+          fi
+
+      - name: Add the iOS platform (pulls both plugins from the local node_modules above)
+        run: npm run build:ios
+
+      - name: Verify that exact source reached platforms/ios
+        run: |
+          ACTUAL=$(git hash-object platforms/ios/packages/cordova-plugin-firebasex-analytics/src/ios/FirebasexAnalyticsPlugin.m)
+          test "$ACTUAL" = "${{ matrix.expected_hash }}"
+
+      - name: Select and boot a simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available --json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)['devices']
+          for runtime, devices in data.items():
+              if 'iOS' not in runtime:
+                  continue
+              for d in devices:
+                  if 'iPhone' in d['name']:
+                      print(d['udid'])
+                      sys.exit(0)
+          sys.exit(1)
+          ")
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl bootstatus "$UDID" -b
+
+      - name: Build for the simulator
+        run: |
+          xcodebuild -workspace platforms/ios/App.xcworkspace -scheme App -sdk iphonesimulator \
+            -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath build/DerivedData \
+            build
+
+      - name: Install and launch
+        id: launch
+        run: |
+          APP="platforms/ios/build/Debug-iphonesimulator/FirebasexLogEventRace.app"
+          xcrun simctl install "${{ steps.sim.outputs.udid }}" "$APP"
+          PID=$(xcrun simctl launch "${{ steps.sim.outputs.udid }}" com.maximbelov.firebasexlogeventrace | grep -oE '[0-9]+$')
+          echo "pid=$PID" >> "$GITHUB_OUTPUT"
+          echo "Launched com.maximbelov.firebasexlogeventrace, pid $PID"
+
+      # The unpatched build crashes within a few seconds in local testing;
+      # the patched build was verified to survive well past a minute.
+      # 40s gives a wide margin on both sides.
+      - name: Run the burst and watch for a crash (up to 40s)
+        id: poll
+        run: |
+          PID=${{ steps.launch.outputs.pid }}
+          DIED=false
+          DIED_AFTER=0
+          for i in $(seq 1 40); do
+            if kill -0 "$PID" 2>/dev/null; then
+              sleep 1
+            else
+              DIED=true
+              DIED_AFTER=$i
+              break
+            fi
+          done
+          xcrun simctl io "${{ steps.sim.outputs.udid }}" screenshot "screenshot-${{ matrix.id }}.png" || true
+          if [ "$DIED" = "true" ]; then
+            echo "outcome=crash" >> "$GITHUB_OUTPUT"
+            echo "died_after=$DIED_AFTER" >> "$GITHUB_OUTPUT"
+          else
+            echo "outcome=survive" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report and verify the outcome
+        env:
+          OUTCOME: ${{ steps.poll.outputs.outcome }}
+          EXPECT: ${{ matrix.expect }}
+        run: |
+          {
+            echo "## ${{ matrix.title }}"
+            echo
+            if [ "$OUTCOME" = "crash" ]; then
+              echo "**Crashed after ~${{ steps.poll.outputs.died_after }}s.**"
+              echo
+              REPORT=$(ls -t "$HOME/Library/Logs/DiagnosticReports/FirebasexLogEventRace-"*.ips 2>/dev/null | head -1)
+              if [ -n "$REPORT" ]; then
+                cp "$REPORT" "crash-report-${{ matrix.id }}.ips"
+                echo '```'
+                python3 scripts/print-crash-summary.py "$REPORT"
+                echo '```'
+              else
+                echo "_(no .ips report was found -- see the job log)_"
+              fi
+            else
+              echo "**Survived the full burst (14,400 logEvent + 7,200 setScreenName calls) with no crash.**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$OUTCOME" != "$EXPECT" ]; then
+            echo "::error::Expected '$EXPECT' but observed '$OUTCOME' for ${{ matrix.id }}"
+            exit 1
+          fi
+          echo "OK: observed '$OUTCOME' as expected for ${{ matrix.id }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.id }}-evidence
+          path: |
+            screenshot-${{ matrix.id }}.png
+            crash-report-${{ matrix.id }}.ips
+          if-no-files-found: ignore
