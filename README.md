@@ -108,9 +108,18 @@ watch whether the app is still running a minute later.
 
 [`.github/workflows/reproduce.yml`](.github/workflows/reproduce.yml) builds
 and runs both versions on a GitHub-hosted macOS runner on every push, and
-fails the job if the outcome isn't the one expected -- so "bug: analytics@2.0.2
-as published" is expected to fail with a crash, and "fix: with PR #5 applied"
-is expected to survive. Both jobs verify, via `git hash-object` on the plugin
-source that actually reached the Xcode build, exactly which version they
-built, and both attach the crash report / screenshot as workflow artifacts.
-Check the [Actions tab](../../actions) for the latest run.
+fails the job if the outcome isn't the one expected -- so the "bug:
+analytics@2.0.2 as published" job is expected to fail with a crash, and the
+"fix: with PR #5 applied" job is expected to survive. Both jobs verify, via
+`git hash-object` on the plugin source that actually reached the Xcode build,
+exactly which version they built, and both attach a screenshot and a device
+log as workflow artifacts. Check the [Actions tab](../../actions) for the
+latest run.
+
+One caveat: on GitHub's own runner, `ReportCrash` doesn't always get to
+write a `.ips` file before the workflow looks for one (there's no logged-in
+session for it to run under), so CI's proof of the crash is the job's
+pass/fail outcome itself, not a freshly generated report every time. The
+actual `.ips` in [`evidence/`](evidence/) is from a real local run, captured
+the same way `npm run build:ios` + `cordova run ios --emulator` would give
+you one.
